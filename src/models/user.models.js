@@ -52,7 +52,8 @@ const userSchema = new mongoose.Schema(
 
 userSchema.pre("save", async function (next) {                // Pre hook runs on save event
     if (this.isModified("password")) {                        // If password field is modified then only hash the password 
-        this.password = await bcrypt.hash(this.password, 10);
+        const salt = bcrypt.genSaltSync(10);                   
+        this.password = await bcrypt.hash(this.password, salt);
         next();
     }
 })
@@ -60,7 +61,6 @@ userSchema.pre("save", async function (next) {                // Pre hook runs o
 userSchema.method.isPasswordCorrect = async function (password) {
     return await bcrypt.compare(password, this.password);
 }
-
 
 userSchema.methods.generateAccessToken = function () {
     return jwt.sign(
