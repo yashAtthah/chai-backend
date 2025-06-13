@@ -14,4 +14,12 @@ app.use(express.urlencoded({extended:true, limit:"16kb"}));   // To pass urlenco
 app.use(express.static("public"))                             // To make folder static
 app.use(cookieParser())                                       // To set-get cookies on browser
 
+/* Routes -- Import */
+import userRouter from "./routes/user.routes.js"
+
+
+/* Routes -- Declare */
+app.use("/api/v1/users",userRouter);
+
+
 export { app };
