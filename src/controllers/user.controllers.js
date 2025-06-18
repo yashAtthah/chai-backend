@@ -12,7 +12,7 @@ const generateAccessAndRefreshTokens = async (userId) => {
         const refreshToken = user.generateRefreshToken();
 
         user.refreshToken = refreshToken;
-        await user.save({validateBeforeSave : false});      // Required fields will give error so that use validateBeforeSave : false
+        await user.save({validateBeforeSave : false});      //  validateBeforeSave: disables Mongoose validation. // Required fields will give error so that use validateBeforeSave : false
         return {accessToken, refreshToken};
     } catch (error) {
         throw new ApiError(500,"Something went wrong while generating refresh and access tokens")
@@ -82,7 +82,7 @@ const loginUser = asyncHandler(async (req,res) => {
         throw new ApiError(401,"Invalid user credentials");
     }
 
-    const {accessToken, refreshToken } = await  generateAccessAndRefreshTokens(user._id);
+    const {accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
 
     const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
 
