@@ -2,7 +2,21 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../models/user.models.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js"
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
+
+const generateAccessAndRefreshTokens = async (userId) => {
+    try {
+        const user = await User.findById(userId);
+        const accessToken = user.generateAccessToken();
+        const refreshToken = user.generateRefreshToken();
+
+        user.refreshToken = refreshToken;
+        await user.save({validateBeforeSave : false});      // Required fields will give error so that use validateBeforeSave : false
+        return {accessToken, refreshToken};
+    } catch (error) {
+        throw new ApiError(500,"Something went wrong while generating refresh and access tokens")
+    }
+}
 
 const registerUser = asyncHandler(async (req, res) => {
     const { fullName, email, username, password } = req.body;
@@ -46,4 +60,75 @@ const registerUser = asyncHandler(async (req, res) => {
 
 })
 
-export { registerUser };
+
+const loginUser = asyncHandler(async (req,res) => {
+    const {email, username, password} = req.body;
+
+    if(!username || !email){
+        throw new ApiError(400,"Username or email is required");
+    }
+
+    const user = await User.findOne({
+        $or : [{username},{email}]
+    });
+
+    if(!user){
+        throw new ApiError(400,"User does not exist");
+    }
+
+    const isPasswordValid = await user.isPasswordCorrect(password);    // Accessing methods created in user model can be accessed through user instance of the database [const user = await User.findOne({})].
+    if(!isPasswordValid){
+        throw new ApiError(401,"Invalid user credentials");
+    }
+
+    const {accessToken, refreshToken } = await  generateAccessAndRefreshTokens(user._id);
+
+    const loggedInUser = User.findById(user._id).select("-password -refreshToken");
+
+    const options = {    // Options for cookie. // With httpOnly and secure cookies can only be modified on server not on frontend    
+        httpOnly: true,
+        secure: true
+    }
+
+    return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+        new ApiResponse(
+            200,
+            {
+                user: loggedInUser, accessToken, refreshToken
+            },
+            "User logged in successfully"
+        )
+    );
+});
+
+const logout = asyncHandler(async (req,res) => {
+    // req.user._id;
+    User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set : {
+                refreshToken:undefined
+            }
+        },
+        {
+            new: true
+        }
+    )
+
+    const options = {    // Options for cookie. // With httpOnly and secure cookies can only be modified on server not on frontend    
+        httpOnly: true,
+        secure: true
+    }
+
+    return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200, {}, "User logged out"));
+})
+
+export { registerUser, loginUser, logout };
